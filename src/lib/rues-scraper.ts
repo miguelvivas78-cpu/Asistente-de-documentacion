@@ -6,73 +6,123 @@ type RuesResult =
   | { success: true; data: string; razonSocial: string; estado: string }
   | { success: false; error: string };
 
+const RUES_URL = "https://www.rues.org.co";
+const RUES_API_URL = "https://elasticprd.rues.org.co/query";
+
+type RuesApiHit = {
+  _source?: Record<string, unknown>;
+};
+
+type RuesApiResponse = {
+  hits?: RuesApiHit[];
+};
+
+// Single shared browser/page to avoid the ~10–30s overhead per request.
+let shared:
+  | {
+      browser: Awaited<ReturnType<typeof puppeteer.launch>>;
+      page: Awaited<ReturnType<Awaited<ReturnType<typeof puppeteer.launch>>["newPage"]>>;
+      ready: boolean;
+    }
+  | undefined;
+
+// Serialize searches to keep a single page stable.
+let queue: Promise<void> = Promise.resolve();
+
+async function getSharedPage() {
+  if (!shared) {
+    const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    };
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+    const browser = await puppeteer.launch(launchOptions);
+    const page = await browser.newPage();
+
+    await page.setCacheEnabled(true);
+    await page.setUserAgent(
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    );
+
+    // Speed up: block heavy assets we don't need for the API call.
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const type = req.resourceType();
+      if (type === "image" || type === "media" || type === "font") return req.abort();
+      return req.continue();
+    });
+
+    shared = { browser, page, ready: false };
+  }
+
+  if (!shared.ready) {
+    await shared.page.goto(RUES_URL, { waitUntil: "domcontentloaded" });
+    // Best-effort close the initial popup (only once).
+    try {
+      await shared.page
+        .waitForSelector("button.swal2-close", { timeout: 3000 })
+        .then(() => shared!.page.$eval("button.swal2-close", (el) => (el as HTMLElement).click()))
+        .catch(() => {});
+    } catch {
+      // ignore
+    }
+    shared.ready = true;
+  }
+
+  return shared.page;
+}
+
+async function runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = queue;
+  let release!: () => void;
+  queue = new Promise<void>((r) => (release = r));
+  await prev;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
 export const scrapeRues = createServerFn({ method: "POST" })
   .handler(async ({ data }: { data: { nit: string } }): Promise<RuesResult> => {
     const { nit } = data;
     if (!nit || !nit.trim()) return { success: false, error: "NIT no proporcionado" };
 
-    let browser = null;
     try {
-      const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
-        headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-      };
-      // En Render, usamos Chromium del sistema vía variable de entorno
-      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-        launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-      }
-      browser = await puppeteer.launch(launchOptions);
+      const apiData = await runExclusive(async () => {
+        const page = await getSharedPage();
 
-      const page = await browser.newPage();
-      await page.setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      );
-
-      // Capturar la respuesta de la API interna de RUES
-      let apiData: Record<string, unknown> | null = null;
-      page.on("response", async (response) => {
-        if (
-          response.url() === "https://elasticprd.rues.org.co/query" &&
-          response.status() === 200
-        ) {
-          try {
-            const json = await response.json();
-            if (json.hits && json.hits.length > 0) {
-              apiData = json.hits[0]._source;
-            }
-          } catch {
-            // Respuesta no JSON, ignorar
-          }
+        // Ensure we are on the main page (rarely it may navigate away).
+        if (!page.url().startsWith(RUES_URL)) {
+          await page.goto(RUES_URL, { waitUntil: "domcontentloaded" });
         }
+
+        await page.waitForSelector("#search", { timeout: 8000 });
+        await page.focus("#search");
+        // Clear input fast.
+        await page.keyboard.down("Control");
+        await page.keyboard.press("A");
+        await page.keyboard.up("Control");
+        await page.keyboard.press("Backspace");
+
+        const wait = page.waitForResponse(
+          (resp) => resp.url() === RUES_API_URL && resp.status() === 200,
+          { timeout: 4500 }
+        );
+
+        await page.type("#search", nit.trim(), { delay: 0 });
+        await page.keyboard.press("Enter");
+
+        const response = await wait;
+        const json = (await response.json()) as RuesApiResponse;
+        const hit = json?.hits?.[0]?._source ?? null;
+        return hit;
       });
 
-      await page.goto("https://www.rues.org.co", { waitUntil: "networkidle2" });
-
-      // Cerrar el popup de SweetAlert2 que aparece al cargar la página
-      try {
-        await page.waitForSelector("button.swal2-close", { timeout: 5000 });
-        await page.$eval("button.swal2-close", (el) => (el as HTMLElement).click());
-        await page
-          .waitForSelector(".swal2-container", { hidden: true, timeout: 3000 })
-          .catch(() => {});
-      } catch {
-        // Si no aparece el popup, continuamos normalmente
-      }
-
-      // Buscar por NIT
-      await page.waitForSelector("#search", { timeout: 8000 });
-      await page.type("#search", nit.trim());
-      await page.keyboard.press("Enter");
-
-      // Esperar a que la API responda con datos (máx 10 segundos)
-      const startTime = Date.now();
-      while (!apiData && Date.now() - startTime < 10000) {
-        await new Promise((r) => setTimeout(r, 500));
-      }
-
-      if (!apiData) {
-        return { success: false, error: "NIT no arrojó resultados" };
-      }
+      if (!apiData) return { success: false, error: "NIT no arrojó resultados" };
 
       // Extraer la información de actividad económica
       const ciiuPri = apiData.cod_ciiu_act_econ_pri as string | null;
@@ -115,9 +165,5 @@ export const scrapeRues = createServerFn({ method: "POST" })
         error:
           "Error al consultar RUES. La página puede estar bloqueando la petición o no respondiendo a tiempo.",
       };
-    } finally {
-      if (browser) {
-        await browser.close();
-      }
     }
   });
