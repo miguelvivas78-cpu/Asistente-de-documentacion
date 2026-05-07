@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import puppeteer, { type HTTPResponse } from "puppeteer";
+import puppeteer from "puppeteer";
 import { getCiiuDescription } from "./ciiu-codes";
 
 type RuesResult =
@@ -7,20 +7,7 @@ type RuesResult =
   | { success: false; error: string };
 
 const RUES_URL = "https://www.rues.org.co";
-const RUES_QUERY_PATH = "/query";
-
-function isRuesQueryResponse(url: string) {
-  try {
-    const u = new URL(url);
-    const path = u.pathname.replace(/\/$/, "") || "/";
-    return u.hostname === "elasticprd.rues.org.co" && path.endsWith(RUES_QUERY_PATH);
-  } catch {
-    return false;
-  }
-}
-
-/** Tiempo de espera tras Enter: RUES en contenedores puede superar fácilmente 5s. */
-const QUERY_RESPONSE_TIMEOUT_MS = 25_000;
+const RUES_API_URL = "https://elasticprd.rues.org.co/query";
 
 type RuesApiHit = {
   _source?: Record<string, unknown>;
@@ -87,17 +74,6 @@ async function getSharedPage() {
   return shared.page;
 }
 
-async function resetSharedBrowser() {
-  if (shared) {
-    try {
-      await shared.browser.close();
-    } catch {
-      // ignore
-    }
-    shared = undefined;
-  }
-}
-
 async function runExclusive<T>(fn: () => Promise<T>): Promise<T> {
   const prev = queue;
   let release!: () => void;
@@ -117,56 +93,33 @@ export const scrapeRues = createServerFn({ method: "POST" })
 
     try {
       const apiData = await runExclusive(async () => {
-        const searchOnce = async () => {
-          const page = await getSharedPage();
+        const page = await getSharedPage();
 
-          if (!page.url().startsWith(RUES_URL)) {
-            await page.goto(RUES_URL, { waitUntil: "domcontentloaded" });
-          }
-
-          await page.waitForSelector("#search", { timeout: 12_000 });
-          await page.click("#search", { clickCount: 3 });
-          await page.keyboard.press("Backspace");
-
-          const nitTrim = nit.trim();
-          let lastHit: Record<string, unknown> | null = null;
-
-          const onResponse = async (response: HTTPResponse) => {
-            if (!isRuesQueryResponse(response.url()) || response.status() !== 200) return;
-            try {
-              const json = (await response.json()) as RuesApiResponse;
-              if (json?.hits && json.hits.length > 0 && json.hits[0]._source) {
-                lastHit = json.hits[0]._source;
-              }
-            } catch {
-              // no es JSON válido, ignorar
-            }
-          };
-
-          page.on("response", onResponse);
-
-          try {
-            await page.type("#search", nitTrim, { delay: 0 });
-            await page.keyboard.press("Enter");
-
-            const deadline = Date.now() + QUERY_RESPONSE_TIMEOUT_MS;
-            while (Date.now() < deadline && !lastHit) {
-              await new Promise((r) => setTimeout(r, 150));
-            }
-          } finally {
-            page.off("response", onResponse);
-          }
-
-          return lastHit;
-        };
-
-        try {
-          return await searchOnce();
-        } catch (firstErr) {
-          console.warn("RUES: primer intento falló, reiniciando navegador y reintentando:", firstErr);
-          await resetSharedBrowser();
-          return await searchOnce();
+        // Ensure we are on the main page (rarely it may navigate away).
+        if (!page.url().startsWith(RUES_URL)) {
+          await page.goto(RUES_URL, { waitUntil: "domcontentloaded" });
         }
+
+        await page.waitForSelector("#search", { timeout: 8000 });
+        await page.focus("#search");
+        // Clear input fast.
+        await page.keyboard.down("Control");
+        await page.keyboard.press("A");
+        await page.keyboard.up("Control");
+        await page.keyboard.press("Backspace");
+
+        const wait = page.waitForResponse(
+          (resp) => resp.url() === RUES_API_URL && resp.status() === 200,
+          { timeout: 4500 }
+        );
+
+        await page.type("#search", nit.trim(), { delay: 0 });
+        await page.keyboard.press("Enter");
+
+        const response = await wait;
+        const json = (await response.json()) as RuesApiResponse;
+        const hit = json?.hits?.[0]?._source ?? null;
+        return hit;
       });
 
       if (!apiData) return { success: false, error: "NIT no arrojó resultados" };
