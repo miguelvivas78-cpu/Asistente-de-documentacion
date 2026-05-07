@@ -1,26 +1,11 @@
+/* ─── Google Fonts ─── */
+@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;1,6..12,400&display=swap");
+
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
-
-/* ─── Google Fonts ─── */
-@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;1,6..12,400&display=swap");
-
-/*
- * Bemio is a commercial font. We load it from a CDN-like self-hosted
- * @font-face so it can be used for titles.
- * If you have the font files, place them in /public/fonts/
- * and update the src below.
- */
-@font-face {
-  font-family: "Bemio";
-  src: url("/fonts/Bemio-Regular.woff2") format("woff2"),
-       url("/fonts/Bemio-Regular.woff") format("woff");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
@@ -73,7 +58,7 @@
 
   /* Typography tokens */
   --font-sans: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Bemio", "Nunito Sans", ui-sans-serif, sans-serif;
+  --font-display: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
@@ -148,10 +133,10 @@
     line-height: 1.6;
   }
 
-  /* Titles use Bemio (secondary / display font) */
+  /* Titles use display font token */
   h1, h2, h3, h4,
   .font-display {
-    font-family: "Bemio", "Nunito Sans", ui-sans-serif, sans-serif;
+    font-family: var(--font-display);
     letter-spacing: -0.01em;
   }
 }

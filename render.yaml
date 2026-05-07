@@ -3,6 +3,8 @@ services:
     name: documate-assistant
     runtime: docker
     plan: free
+    autoDeploy: true
+    healthCheckPath: /
     envVars:
       - key: PORT
         value: 3000
