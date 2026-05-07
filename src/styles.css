@@ -1,0 +1,204 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Google Fonts ─── */
+@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;1,6..12,400&display=swap");
+
+/*
+ * Bemio is a commercial font. We load it from a CDN-like self-hosted
+ * @font-face so it can be used for titles.
+ * If you have the font files, place them in /public/fonts/
+ * and update the src below.
+ */
+@font-face {
+  font-family: "Bemio";
+  src: url("/fonts/Bemio-Regular.woff2") format("woff2"),
+       url("/fonts/Bemio-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  /* Siigo brand colors */
+  --color-siigo-blue: var(--siigo-blue);
+  --color-siigo-blue-dark: var(--siigo-blue-dark);
+  --color-siigo-blue-light: var(--siigo-blue-light);
+  --color-siigo-blue-muted: var(--siigo-blue-muted);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Typography tokens */
+  --font-sans: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bemio", "Nunito Sans", ui-sans-serif, sans-serif;
+}
+
+:root {
+  --radius: 0.5rem;
+
+  /* ── Siigo brand palette ── */
+  --siigo-blue:       #00aaff;
+  --siigo-blue-dark:  #0077cc;
+  --siigo-blue-light: #e0f4ff;
+  --siigo-blue-muted: #cceeff;
+
+  /* ── Semantic tokens (light mode) ── */
+  --background: #f0f8ff;            /* very light blue-white */
+  --foreground: #0a1929;            /* deep navy */
+  --card:        #ffffff;
+  --card-foreground: #0a1929;
+  --popover: #ffffff;
+  --popover-foreground: #0a1929;
+
+  --primary: #00aaff;
+  --primary-foreground: #ffffff;
+
+  --secondary: #e0f4ff;
+  --secondary-foreground: #0a1929;
+
+  --muted: #e8f4fe;
+  --muted-foreground: #4b7ea8;
+
+  --accent: #cceeff;
+  --accent-foreground: #0a1929;
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: #ffffff;
+
+  --border: #b8dff5;
+  --input:  #d0eafa;
+  --ring:   #00aaff;
+
+  --chart-1: #00aaff;
+  --chart-2: #0077cc;
+  --chart-3: #33bbff;
+  --chart-4: #66ccff;
+  --chart-5: #99ddff;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0a1929;
+  --sidebar-primary: #00aaff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e0f4ff;
+  --sidebar-accent-foreground: #0a1929;
+  --sidebar-border: #b8dff5;
+  --sidebar-ring: #00aaff;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    font-family: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "kern" 1, "liga" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  /* Titles use Bemio (secondary / display font) */
+  h1, h2, h3, h4,
+  .font-display {
+    font-family: "Bemio", "Nunito Sans", ui-sans-serif, sans-serif;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ── Siigo accent gradient used for the top bar ── */
+.siigo-header-bar {
+  background: linear-gradient(135deg, #00aaff 0%, #0077cc 100%);
+}
+
+/* ── Glassy card effect ── */
+.siigo-card {
+  background: #ffffff;
+  border: 1px solid #b8dff5;
+  box-shadow: 0 2px 16px 0 rgba(0, 170, 255, 0.08),
+              0 1px 4px 0 rgba(0, 0, 0, 0.04);
+}
+
+/* ── Primary button override for Siigo blue ── */
+.btn-siigo {
+  background: linear-gradient(135deg, #00aaff 0%, #0077cc 100%);
+  color: #ffffff;
+  border: none;
+  transition: box-shadow 0.2s, transform 0.1s;
+}
+.btn-siigo:hover:not(:disabled) {
+  box-shadow: 0 4px 16px rgba(0, 170, 255, 0.35);
+  transform: translateY(-1px);
+}
+.btn-siigo:active:not(:disabled) {
+  transform: translateY(0);
+}
+.btn-siigo:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Input focus ring ── */
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--siigo-blue);
+  border-color: var(--siigo-blue) !important;
+}
+
+/* ── RUES search box accent ── */
+.rues-box {
+  background: linear-gradient(135deg, #e0f4ff 0%, #cceeff 100%);
+  border: 1px solid #99ddff;
+  border-radius: 0.625rem;
+}
