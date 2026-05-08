@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { scrapeRues } from "../lib/rues-scraper";
+import { getCiiuDescription } from "../lib/ciiu-codes";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -107,14 +108,37 @@ function Index() {
             body: JSON.stringify({ nit }),
           }).then((r) => r.json())
         : await scrapeRues({ data: { nit } });
-      if (res.success && res.data) {
+      // External API returns a raw record (datos.gov.co). Convert to our expected shape.
+      const normalized =
+        res?.success !== undefined
+          ? res
+          : (() => {
+              const razonSocial = res?.razon_social || "Sin razón social";
+              const estado = res?.estado_matricula || "Desconocido";
+              const ciiuPri = res?.cod_ciiu_act_econ_pri;
+              const ciiuSec = res?.cod_ciiu_act_econ_sec;
+              const activities: string[] = [];
+              if (ciiuPri) activities.push(`CIIU ${ciiuPri} - ${getCiiuDescription(String(ciiuPri))}`);
+              if (ciiuSec) activities.push(`CIIU ${ciiuSec} - ${getCiiuDescription(String(ciiuSec))}`);
+              if (activities.length === 0) {
+                return { success: false, error: "No se encontró actividad económica para este NIT" };
+              }
+              return {
+                success: true,
+                data: `${razonSocial} — ${activities.join(" | ")} — Estado: ${estado}`,
+                razonSocial,
+                estado,
+              };
+            })();
+
+      if (normalized?.success && normalized?.data) {
         toast.success("Información extraída correctamente");
         const dedicacionField = config.fields.find(f => f.id === "dedicacion" || f.label.toLowerCase().includes("dedica"));
         if (dedicacionField) {
-           update(dedicacionField.id, res.data);
+           update(dedicacionField.id, normalized.data);
         }
       } else {
-        toast.error(res.error || "NIT no arrojó resultados");
+        toast.error(normalized?.error || "NIT no arrojó resultados");
       }
     } catch (e) {
       toast.error("Error al conectar con el servidor de búsqueda");

@@ -1,0 +1,4 @@
+name = "rues-siigo"
+main = "src/index.ts"
+compatibility_date = "2026-05-08"
+
