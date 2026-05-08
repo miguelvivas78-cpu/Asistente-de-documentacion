@@ -99,7 +99,14 @@ function Index() {
     }
     setIsScraping(true);
     try {
-      const res = await scrapeRues({ data: { nit } });
+      const ruesApiUrl = import.meta.env.VITE_RUES_API_URL as string | undefined;
+      const res = ruesApiUrl
+        ? await fetch(ruesApiUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ nit }),
+          }).then((r) => r.json())
+        : await scrapeRues({ data: { nit } });
       if (res.success && res.data) {
         toast.success("Información extraída correctamente");
         const dedicacionField = config.fields.find(f => f.id === "dedicacion" || f.label.toLowerCase().includes("dedica"));
